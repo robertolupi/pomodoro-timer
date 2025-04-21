@@ -7,6 +7,7 @@
 #include <M5Unified.h>
 #include <esp_log.h>
 
+#include "WiFiSettings.h"
 #include "Configuration.h"
 #include "Pomodoro.h"
 #include "ClockFace.h"
@@ -14,6 +15,7 @@
 #include "Gong.h"
 #include "LoggerProbe.h"
 #include "Leds.h"
+
 
 void setup()
 {
@@ -24,23 +26,28 @@ void setup()
     try
     {
         Splash splash;
-        if (!Configuration.load())
-            throw std::runtime_error("Failed to load configuration");
-        const std::string ssid = Configuration["wifi"]["ssid"];
-        if (ssid.empty())
-            throw std::runtime_error("WiFi SSID not found");
-        const std::string password = Configuration["wifi"]["pass"];
-        if (password.empty())
-            throw std::runtime_error("WiFi password not found");
+        std::string ssid = wifi::ssid;
+        std::string password = wifi::password;
+        std::string ntpServer = "pool.ntp.org";
+        std::string timezone = "CET-1CEST,M3.5.0,M10.5.0/3";
+
+        if (Configuration.load()) {
+            ssid = Configuration["wifi"]["ssid"];
+            if (ssid.empty())
+                throw std::runtime_error("WiFi SSID not found");
+            password = Configuration["wifi"]["pass"];
+            if (password.empty())
+                throw std::runtime_error("WiFi password not found");
+            ntpServer = Configuration["ntp"]["host"];
+            if (ntpServer.empty())
+                throw std::runtime_error("NTP server not found");
+            timezone = Configuration["ntp"]["tz"];
+        }
         WiFi.begin(ssid.c_str(), password.c_str());
         while (WiFi.status() != WL_CONNECTED)
         {
             delay(500);
         }
-        const std::string ntpServer = Configuration["ntp"]["host"];
-        if (ntpServer.empty())
-            throw std::runtime_error("NTP server not found");
-        const std::string timezone = Configuration["ntp"]["tz"];
         configTzTime(timezone.c_str(), ntpServer.c_str());
         // It takes a couple of seconds to have the correct timezone
         delay(2000);
