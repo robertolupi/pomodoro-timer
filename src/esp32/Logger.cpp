@@ -1,7 +1,5 @@
 #include <fstream>
 
-#include <esp_log.h>
-
 #include "Logger.h"
 #include "SDCard.h"
 
@@ -30,8 +28,6 @@ void Logger::log_pomodoro(time_t start, time_t end, uint8_t flavor) {
 
     String st_start = isoformat_ctime(&start);
     String st_end = isoformat_ctime(&end);
-
-    ESP_LOGI("Logger", "Logging pomodoro: start=%s end=%s flavor=%d", st_start.c_str(), st_end.c_str(), flavor);
 
     file << st_start.c_str() << "," << st_end.c_str() << "," << static_cast<int>(flavor) << "\n";
 }

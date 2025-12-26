@@ -14,7 +14,6 @@
 #include "Splash.h"
 #include "Gong.h"
 #include "Logger.h"
-#include "LoggerProbe.h"
 #include "Leds.h"
 
 
@@ -22,7 +21,6 @@ void setup()
 {
     M5.begin();
     Serial.begin(115200);
-    ESP_LOGI("main", "Pomodoro Timer");
 
     try
     {
@@ -55,15 +53,13 @@ void setup()
     {
         M5.Lcd.setTextSize(2);
         M5.Lcd.print(e.what());
-        ESP_LOGE("main", "Exception: %s", e.what());
+        Serial.println("Exception: " + String(e.what()));
         return;
     }
 
     PomodoroClock pomodoro;
     Logger logger;
     pomodoro.add_observer(logger);
-    // LoggerProbe probe;
-    // pomodoro.add_observer(probe);
 
     ClockFace clock_face;
     Gong gong;
