@@ -13,6 +13,7 @@
 #include "ClockFace.h"
 #include "Splash.h"
 #include "Gong.h"
+#include "Logger.h"
 #include "LoggerProbe.h"
 #include "Leds.h"
 
@@ -59,6 +60,8 @@ void setup()
     }
 
     PomodoroClock pomodoro;
+    Logger logger;
+    pomodoro.add_observer(logger);
     // LoggerProbe probe;
     // pomodoro.add_observer(probe);
 
