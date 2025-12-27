@@ -32,4 +32,20 @@ pass=your wifi password
 [ntp]
 host=your ntp host (e.g. your router) or pool.ntp.org
 tz=CET-1CEST,M3.5.0,M10.5.0/3
+
+[http]
+host=your backend host or ip
+port=8080
+```
+
+## HTTP notifications
+
+Pomodoro transitions are queued on the SD card in `/queue` and sent in chronological order.
+The REST endpoint is `POST /pomodoros/{start_time}/transitions` with a JSON body that includes
+`transition`, `start_time`, and `event_time`.
+
+To run the reference backend locally:
+
+```sh
+python3 tools/http_backend.py
 ```

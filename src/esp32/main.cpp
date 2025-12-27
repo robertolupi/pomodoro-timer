@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <SD.h> // must be included before M5Unified.h
 #include <WiFi.h>
+#include <cstdlib>
 
 #include <M5Unified.h>
 #include <esp_log.h>
@@ -15,12 +16,16 @@
 #include "Gong.h"
 #include "Logger.h"
 #include "Leds.h"
+#include "HttpNotifier.h"
 
 
 void setup()
 {
     M5.begin();
     Serial.begin(115200);
+
+    std::string httpHost;
+    uint16_t httpPort = 0;
 
     try
     {
@@ -41,6 +46,12 @@ void setup()
             if (ntpServer.empty())
                 throw std::runtime_error("NTP server not found");
             timezone = Configuration["ntp"]["tz"];
+            httpHost = Configuration["http"]["host"];
+            std::string httpPortString = Configuration["http"]["port"];
+            if (!httpPortString.empty())
+            {
+                httpPort = static_cast<uint16_t>(std::strtoul(httpPortString.c_str(), nullptr, 10));
+            }
         }
         WiFi.begin(ssid.c_str(), password.c_str());
         while (WiFi.status() != WL_CONNECTED)
@@ -64,9 +75,11 @@ void setup()
     ClockFace clock_face;
     Gong gong;
     Leds leds;
+    HttpNotifier notifier(httpHost.c_str(), httpPort);
     pomodoro.add_observer(clock_face);
     pomodoro.add_observer(gong);
     pomodoro.add_observer(leds);
+    pomodoro.add_observer(notifier);
 
 
     while (true)
