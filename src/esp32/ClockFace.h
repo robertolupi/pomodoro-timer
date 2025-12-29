@@ -48,7 +48,7 @@ public:
 private:
     M5Canvas canvas_;
 
-    void drawTime(const char* time, int color, int line);
+    void drawTime(const char* time, int color, int line, int font, int font_size);
     void drawFlavor(const uint8_t flavor);
 };
 
