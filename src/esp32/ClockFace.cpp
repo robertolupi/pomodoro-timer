@@ -27,8 +27,8 @@ inline void ClockFace::notification(ClockUpdate update)
   case IDLE:
     canvas_.fillScreen(BLACK);
     drawTime(time_buffer, WHITE, 0, 7, 1);
-    drawTime(time_buffer2, YELLOW, 1, 4, 2);
-    drawTime(days_of_week[weekday_index], YELLOW, 2, 4, 2);
+    drawTime(time_buffer2, YELLOW, 1, 4, 1);
+    drawTime(days_of_week[weekday_index], YELLOW, 2, 4, 1);
     break;
   case WORK:
     canvas_.fillScreen(DARKGREEN);
