@@ -31,6 +31,7 @@ private:
     String host_;
     uint16_t port_;
     time_t current_start_time_;
+    uint8_t current_work_flavor_;
     bool enabled_;
     TaskHandle_t queue_task_;
     SemaphoreHandle_t sd_mutex_;

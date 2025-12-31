@@ -47,12 +47,14 @@ bool PomodoroClock::Cancel(const time_t now)
         state_ = IDLE;
         last_state_change_at_ = now;
         notify_observers(work_to_idle);
+        work_flavor_ = 0;
         result = true;
         break;
     case BREAK:
         state_ = IDLE;
         last_state_change_at_ = now;
         notify_observers(break_to_idle);
+        work_flavor_ = 0;
         result = true;
         break;
     case IDLE:
@@ -76,15 +78,14 @@ void PomodoroClock::PassageOfTime(const time_t now)
             state_ = BREAK;
             last_state_change_at_ = now;
             state_ends_at_ = state_ends_at_ + break_duration_;
-            work_flavor_ = 0;
             notify_observers(work_to_break);
             break;
         case BREAK:
             state_ = IDLE;
             last_state_change_at_ = state_ends_at_;
             state_ends_at_ = 0;
-            work_flavor_ = 0;
             notify_observers(break_to_idle);
+            work_flavor_ = 0;
             break;
         default:
             break;

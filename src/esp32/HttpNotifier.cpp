@@ -16,6 +16,7 @@ HttpNotifier::HttpNotifier(const char* host, const uint16_t port)
     : host_(host ? host : ""),
       port_(port),
       current_start_time_(0),
+      current_work_flavor_(0),
       enabled_(false),
       queue_task_(nullptr),
       sd_mutex_(nullptr),
@@ -60,6 +61,7 @@ void HttpNotifier::notification(const IdleToWork update)
         return;
     }
     current_start_time_ = update.now;
+    current_work_flavor_ = update.work_flavor;
     const String extra_json = String("\"work_flavor\":\"") + escapeJsonString(flavorLabel(update.work_flavor)) + "\"";
     enqueueEvent(update.now, current_start_time_, "idle_to_work", extra_json);
     notifyQueueTask();
@@ -73,7 +75,11 @@ void HttpNotifier::notification(const WorkToBreak update)
     }
     const time_t start_time = current_start_time_ > 0 ? current_start_time_ : update.now - update.work_duration;
     current_start_time_ = start_time;
-    const String extra_json = String("\"work_duration\":") + String(static_cast<unsigned long>(update.work_duration));
+    const String extra_json = String("\"work_duration\":")
+        + String(static_cast<unsigned long>(update.work_duration))
+        + ",\"work_flavor\":\""
+        + escapeJsonString(flavorLabel(current_work_flavor_))
+        + "\"";
     enqueueEvent(update.now, start_time, "work_to_break", extra_json);
     notifyQueueTask();
 }
@@ -88,6 +94,7 @@ void HttpNotifier::notification(const BreakToIdle update)
     const String extra_json = String("\"break_duration\":") + String(static_cast<unsigned long>(update.break_duration));
     enqueueEvent(update.now, start_time, "break_to_idle", extra_json);
     current_start_time_ = 0;
+    current_work_flavor_ = 0;
     notifyQueueTask();
 }
 
@@ -98,9 +105,14 @@ void HttpNotifier::notification(const WorkToIdle update)
         return;
     }
     const time_t start_time = current_start_time_ > 0 ? current_start_time_ : update.now - update.cancelled_work_duration;
-    const String extra_json = String("\"cancelled_work_duration\":") + String(static_cast<unsigned long>(update.cancelled_work_duration));
+    const String extra_json = String("\"cancelled_work_duration\":")
+        + String(static_cast<unsigned long>(update.cancelled_work_duration))
+        + ",\"work_flavor\":\""
+        + escapeJsonString(flavorLabel(current_work_flavor_))
+        + "\"";
     enqueueEvent(update.now, start_time, "work_to_idle", extra_json);
     current_start_time_ = 0;
+    current_work_flavor_ = 0;
     notifyQueueTask();
 }
 
