@@ -5,6 +5,8 @@
 #ifndef HTTPNOTIFIER_H
 #define HTTPNOTIFIER_H
 
+#include <array>
+
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
@@ -16,6 +18,7 @@ class HttpNotifier final : public PomodoroObserver
 {
 public:
     HttpNotifier(const char* host, uint16_t port);
+    void setFlavorLabels(const std::array<String, 3>& labels);
 
     void notification(ClockUpdate update) override;
     void notification(IdleToWork update) override;
@@ -31,6 +34,7 @@ private:
     bool enabled_;
     TaskHandle_t queue_task_;
     SemaphoreHandle_t sd_mutex_;
+    std::array<String, 3> flavor_labels_;
 
     bool ensureQueueDir();
     String makeQueueFilename(time_t event_time);
@@ -39,6 +43,8 @@ private:
     bool flushQueueOnce();
     bool sendPayload(const String& payload, time_t start_time);
     bool extractUInt64(const String& payload, const char* key, unsigned long long* value) const;
+    String flavorLabel(uint8_t flavor) const;
+    String escapeJsonString(const String& input) const;
     void notifyQueueTask();
     bool lockSd(TickType_t timeout);
     void unlockSd();

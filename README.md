@@ -36,13 +36,18 @@ tz=CET-1CEST,M3.5.0,M10.5.0/3
 [http]
 host=your backend host or ip
 port=8080
+
+[flavors]
+flavor0=work
+flavor1=leisure
+flavor2=chores
 ```
 
 ## HTTP notifications
 
 Pomodoro transitions are queued on the SD card in `/queue` and sent in chronological order.
 The REST endpoint is `POST /pomodoros/{start_time}/transitions` with a JSON body that includes
-`transition`, `start_time`, and `event_time`.
+`transition`, `start_time`, `event_time`, and `work_flavor` (string label).
 
 To run the reference backend locally:
 

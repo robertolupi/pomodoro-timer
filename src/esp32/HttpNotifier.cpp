@@ -18,7 +18,8 @@ HttpNotifier::HttpNotifier(const char* host, const uint16_t port)
       current_start_time_(0),
       enabled_(false),
       queue_task_(nullptr),
-      sd_mutex_(nullptr)
+      sd_mutex_(nullptr),
+      flavor_labels_({String("0"), String("1"), String("2")})
 {
     enabled_ = host_.length() > 0 && port_ > 0;
     if (enabled_)
@@ -38,6 +39,11 @@ HttpNotifier::HttpNotifier(const char* host, const uint16_t port)
     }
 }
 
+void HttpNotifier::setFlavorLabels(const std::array<String, 3>& labels)
+{
+    flavor_labels_ = labels;
+}
+
 void HttpNotifier::notification(const ClockUpdate)
 {
     if (!enabled_)
@@ -54,7 +60,7 @@ void HttpNotifier::notification(const IdleToWork update)
         return;
     }
     current_start_time_ = update.now;
-    const String extra_json = String("\"work_flavor\":") + String(update.work_flavor);
+    const String extra_json = String("\"work_flavor\":\"") + escapeJsonString(flavorLabel(update.work_flavor)) + "\"";
     enqueueEvent(update.now, current_start_time_, "idle_to_work", extra_json);
     notifyQueueTask();
 }
@@ -202,6 +208,46 @@ bool HttpNotifier::extractUInt64(const String& payload, const char* key, unsigne
     }
     *value = strtoull(payload.substring(index, end).c_str(), nullptr, 10);
     return true;
+}
+
+String HttpNotifier::flavorLabel(const uint8_t flavor) const
+{
+    if (flavor < flavor_labels_.size() && flavor_labels_[flavor].length() > 0)
+    {
+        return flavor_labels_[flavor];
+    }
+    return String(flavor);
+}
+
+String HttpNotifier::escapeJsonString(const String& input) const
+{
+    String output;
+    output.reserve(input.length());
+    for (unsigned int i = 0; i < input.length(); i++)
+    {
+        const char ch = input[i];
+        switch (ch)
+        {
+        case '\\':
+        case '"':
+            output += '\\';
+            output += ch;
+            break;
+        case '\n':
+            output += "\\n";
+            break;
+        case '\r':
+            output += "\\r";
+            break;
+        case '\t':
+            output += "\\t";
+            break;
+        default:
+            output += ch;
+            break;
+        }
+    }
+    return output;
 }
 
 bool HttpNotifier::flushQueueOnce()

@@ -18,7 +18,7 @@ def init_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             start_time INTEGER NOT NULL,
             end_time INTEGER,
-            work_flavor INTEGER,
+            work_flavor TEXT,
             work_duration INTEGER,
             break_duration INTEGER,
             cancelled BOOLEAN DEFAULT FALSE,
@@ -59,7 +59,9 @@ def save_to_database(start_time, payload):
     
     if transition_type == 'idle_to_work':
         # Start of a new pomodoro
-        work_flavor = payload.get('work_flavor', 0)
+        work_flavor = payload.get('work_flavor', "0")
+        if work_flavor is not None and not isinstance(work_flavor, str):
+            work_flavor = str(work_flavor)
         if pomodoro_record is None:
             cursor.execute('''
                 INSERT INTO pomodoros (start_time, work_flavor)

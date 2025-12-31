@@ -4,6 +4,7 @@
 #include <SD.h> // must be included before M5Unified.h
 #include <WiFi.h>
 #include <cstdlib>
+#include <array>
 
 #include <M5Unified.h>
 #include <esp_log.h>
@@ -26,6 +27,7 @@ void setup()
 
     std::string httpHost;
     uint16_t httpPort = 0;
+    std::array<String, 3> flavor_labels = {String("work"), String("leisure"), String("chores")};
 
     try
     {
@@ -52,6 +54,21 @@ void setup()
             {
                 httpPort = static_cast<uint16_t>(std::strtoul(httpPortString.c_str(), nullptr, 10));
             }
+            const std::string flavor0 = Configuration["flavors"]["flavor0"];
+            const std::string flavor1 = Configuration["flavors"]["flavor1"];
+            const std::string flavor2 = Configuration["flavors"]["flavor2"];
+            if (!flavor0.empty())
+            {
+                flavor_labels[0] = flavor0.c_str();
+            }
+            if (!flavor1.empty())
+            {
+                flavor_labels[1] = flavor1.c_str();
+            }
+            if (!flavor2.empty())
+            {
+                flavor_labels[2] = flavor2.c_str();
+            }
         }
         WiFi.begin(ssid.c_str(), password.c_str());
         while (WiFi.status() != WL_CONNECTED)
@@ -76,6 +93,8 @@ void setup()
     Gong gong;
     Leds leds;
     HttpNotifier notifier(httpHost.c_str(), httpPort);
+    clock_face.setFlavorLabels(flavor_labels);
+    notifier.setFlavorLabels(flavor_labels);
     pomodoro.add_observer(clock_face);
     pomodoro.add_observer(gong);
     pomodoro.add_observer(leds);

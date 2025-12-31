@@ -58,8 +58,13 @@ void ClockFace::drawTime(const char* time, int color, int line, int font, int fo
 
 void ClockFace::drawFlavor(const uint8_t flavor)
 {
-  canvas_.setTextColor(DARKGREY);
-  canvas_.setTextSize(3);
-  canvas_.setTextFont(8);
-  canvas_.drawString(String(flavor), 10, 10);
+  canvas_.setTextColor(BLACK);
+  canvas_.setTextSize(1);
+  canvas_.setTextFont(4);
+  String label = String(flavor);
+  if (flavor < flavor_labels_.size() && flavor_labels_[flavor].length() > 0)
+  {
+    label = flavor_labels_[flavor];
+  }
+  canvas_.drawString(label, 10, 10);
 }
