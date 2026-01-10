@@ -172,7 +172,7 @@ bool HttpNotifier::enqueueEvent(const time_t event_time, const time_t start_time
     {
         return false;
     }
-    if (!lockSd(portMAX_DELAY))
+    if (!lockSd(pdMS_TO_TICKS(200)))
     {
         return false;
     }
