@@ -19,6 +19,7 @@ HttpNotifier::HttpNotifier(const char* host, const uint16_t port)
       current_work_flavor_(0),
       enabled_(false),
       queue_task_(nullptr),
+      event_queue_(nullptr),
       sd_mutex_(nullptr),
       flavor_labels_({String("0"), String("1"), String("2")})
 {
@@ -35,6 +36,7 @@ HttpNotifier::HttpNotifier(const char* host, const uint16_t port)
                 unlockSd();
             }
         }
+        event_queue_ = xQueueCreate(16, sizeof(QueueEvent*));
         xTaskCreatePinnedToCore(queueTaskTrampoline, "HttpNotifyQueue", 8192, this, 1, &queue_task_, 0);
         notifyQueueTask();
     }
@@ -167,6 +169,22 @@ String HttpNotifier::makePayload(const time_t event_time, const time_t start_tim
 
 bool HttpNotifier::enqueueEvent(const time_t event_time, const time_t start_time, const char* transition, const String& extra_json)
 {
+    if (!event_queue_)
+    {
+        return false;
+    }
+    QueueEvent* event = new QueueEvent{event_time, start_time, String(transition), extra_json};
+    if (xQueueSend(event_queue_, &event, pdMS_TO_TICKS(50)) != pdTRUE)
+    {
+        delete event;
+        return false;
+    }
+    notifyQueueTask();
+    return true;
+}
+
+bool HttpNotifier::persistEvent(const QueueEvent& event)
+{
     SDCard with_sd_card;
     if (!with_sd_card)
     {
@@ -182,8 +200,8 @@ bool HttpNotifier::enqueueEvent(const time_t event_time, const time_t start_time
         return false;
     }
 
-    const String path = makeQueueFilename(event_time);
-    const String payload = makePayload(event_time, start_time, transition, extra_json);
+    const String path = makeQueueFilename(event.event_time);
+    const String payload = makePayload(event.event_time, event.start_time, event.transition.c_str(), event.extra_json);
     File file = SD.open(path, FILE_WRITE);
     if (!file)
     {
@@ -417,6 +435,18 @@ void HttpNotifier::queueTask()
         if (!enabled_)
         {
             continue;
+        }
+        if (event_queue_)
+        {
+            QueueEvent* event = nullptr;
+            while (xQueueReceive(event_queue_, &event, 0) == pdTRUE)
+            {
+                if (event)
+                {
+                    persistEvent(*event);
+                    delete event;
+                }
+            }
         }
         while (flushQueueOnce())
         {
