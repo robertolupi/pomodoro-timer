@@ -9,6 +9,11 @@
 
 #include <etl/observer.h>
 
+#if defined(ARDUINO_ARCH_ESP32)
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#endif
+
 enum PomodoroState
 {
     // States (also used for passage of time updates)
@@ -86,6 +91,32 @@ private:
     uint8_t work_flavor_;
     PomodoroState state_;
     time_t break_duration_;
+};
+
+class PomodoroWatchdog final : public PomodoroObserver
+{
+public:
+    explicit PomodoroWatchdog(time_t timeout_seconds = 15);
+
+    void notification(ClockUpdate update) override;
+    void notification(IdleToWork update) override;
+    void notification(WorkToBreak update) override;
+    void notification(BreakToIdle update) override;
+    void notification(WorkToIdle update) override;
+    void notification(AdditionalWork update) override;
+
+private:
+    time_t timeout_seconds_;
+    volatile time_t last_update_;
+
+#if defined(ARDUINO_ARCH_ESP32)
+    TaskHandle_t task_;
+    static void taskTrampoline(void* context);
+    void taskLoop();
+#endif
+
+    void touch(time_t now);
+    void check(time_t now);
 };
 
 #endif //POMODORO_H

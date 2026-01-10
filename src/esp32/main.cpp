@@ -90,12 +90,14 @@ void setup()
     pomodoro.add_observer(logger);
 
     ClockFace clock_face;
+    PomodoroWatchdog watchdog;
     Gong gong;
     Leds leds;
     HttpNotifier notifier(httpHost.c_str(), httpPort);
     clock_face.setFlavorLabels(flavor_labels);
     notifier.setFlavorLabels(flavor_labels);
     pomodoro.add_observer(clock_face);
+    pomodoro.add_observer(watchdog);
     pomodoro.add_observer(gong);
     pomodoro.add_observer(leds);
     pomodoro.add_observer(notifier);
