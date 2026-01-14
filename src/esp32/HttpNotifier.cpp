@@ -169,15 +169,21 @@ String HttpNotifier::makePayload(const time_t event_time, const time_t start_tim
 
 bool HttpNotifier::enqueueEvent(const time_t event_time, const time_t start_time, const char* transition, const String& extra_json)
 {
+    Serial.println("HttpNotifier: Enqueuing event: " + String(transition) + " at " + String(static_cast<unsigned long>(event_time)));
+
     if (!event_queue_)
     {
+        Serial.println("HttpNotifier: Event queue not available");
         return false;
     }
     QueueEvent* event = new QueueEvent{event_time, start_time, String(transition), extra_json};
     if (xQueueSend(event_queue_, &event, pdMS_TO_TICKS(50)) != pdTRUE)
     {
+        Serial.println("HttpNotifier: Failed to enqueue event");
         delete event;
         return false;
+    } else {
+        Serial.println("HttpNotifier: Event enqueued");
     }
     notifyQueueTask();
     return true;
@@ -282,14 +288,17 @@ String HttpNotifier::escapeJsonString(const String& input) const
 
 bool HttpNotifier::flushQueueOnce()
 {
+    Serial.println("HttpNotifier: Flushing queued events...");
     if (WiFi.status() != WL_CONNECTED)
     {
+        Serial.println("HttpNotifier: WiFi not connected");
         return false;
     }
 
     SDCard with_sd_card;
     if (!with_sd_card)
     {
+        Serial.println("HttpNotifier: SD card not available");
         return false;
     }
 
@@ -297,12 +306,14 @@ bool HttpNotifier::flushQueueOnce()
     String payload;
     if (!lockSd(portMAX_DELAY))
     {
+        Serial.println("HttpNotifier: Failed to lock SD card");
         return false;
     }
     File dir = SD.open("/queue");
     if (!dir || !dir.isDirectory())
     {
         unlockSd();
+        Serial.println("HttpNotifier: Failed to open queue directory");
         return false;
     }
 
@@ -330,6 +341,8 @@ bool HttpNotifier::flushQueueOnce()
         entry = dir.openNextFile();
     }
     dir.close();
+
+    Serial.println("HttpNotifier: Oldest queued event: " + oldest_name);
 
     if (oldest_name.length() == 0)
     {
@@ -359,6 +372,7 @@ bool HttpNotifier::flushQueueOnce()
 
     if (!sendPayload(payload, static_cast<time_t>(start_time)))
     {
+        Serial.println("HttpNotifier: Failed to send payload");
         return false;
     }
 
@@ -367,6 +381,7 @@ bool HttpNotifier::flushQueueOnce()
         SD.remove(path);
         unlockSd();
     }
+    Serial.println("HttpNotifier: end flushQueueOnce");
     return true;
 }
 
@@ -380,19 +395,23 @@ bool HttpNotifier::sendPayload(const String& payload, const time_t start_time)
     HTTPClient http;
     WiFiClient client;
     String url = "http://" + host_ + ":" + String(port_) + "/pomodoros/" + String(static_cast<unsigned long>(start_time)) + "/transitions";
+    Serial.println("HttpNotifier: Sending payload to " + url);
     if (!http.begin(client, url))
     {
+        Serial.println("HttpNotifier: HTTP begin failed");
         return false;
     }
     http.addHeader("Content-Type", "application/json");
     http.setTimeout(2000);
     const int code = http.POST(payload);
     http.end();
+    Serial.println("HttpNotifier: HTTP response code: " + String(code));
     return code >= 200 && code < 300;
 }
 
 void HttpNotifier::notifyQueueTask()
 {
+    Serial.println("HttpNotifier: Notifying queue task");
     if (queue_task_)
     {
         xTaskNotifyGive(queue_task_);

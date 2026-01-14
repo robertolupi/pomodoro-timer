@@ -63,7 +63,7 @@ struct AdditionalWork
 
 typedef etl::observer<ClockUpdate, IdleToWork, WorkToBreak, BreakToIdle, WorkToIdle, AdditionalWork> PomodoroObserver;
 
-constexpr int MAX_POMODORO_OBSERVERS = 5;
+constexpr int MAX_POMODORO_OBSERVERS = 6;
 constexpr time_t WORK_DEFAULT_DURATION_SECONDS = 25 * 60;
 constexpr time_t BREAK_DEFAULT_DURATION_SECONDS = 5 * 60;
 
