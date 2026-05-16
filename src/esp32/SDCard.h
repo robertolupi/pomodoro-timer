@@ -20,7 +20,6 @@ public:
   explicit operator bool () const { return mounted; }
 private:
   static bool mounted;
-  static int instances;
   static std::mutex mutex;
 };
 

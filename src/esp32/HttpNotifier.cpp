@@ -20,21 +20,15 @@ HttpNotifier::HttpNotifier(const char* host, const uint16_t port)
       enabled_(false),
       queue_task_(nullptr),
       event_queue_(nullptr),
-      sd_mutex_(nullptr),
       flavor_labels_({String("0"), String("1"), String("2")})
 {
     enabled_ = host_.length() > 0 && port_ > 0;
     if (enabled_)
     {
-        sd_mutex_ = xSemaphoreCreateMutex();
         SDCard with_sd_card;
         if (with_sd_card)
         {
-            if (lockSd(pdMS_TO_TICKS(250)))
-            {
-                ensureQueueDir();
-                unlockSd();
-            }
+            ensureQueueDir();
         }
         event_queue_ = xQueueCreate(16, sizeof(QueueEvent*));
         xTaskCreatePinnedToCore(queueTaskTrampoline, "HttpNotifyQueue", 8192, this, 1, &queue_task_, 0);
@@ -196,13 +190,8 @@ bool HttpNotifier::persistEvent(const QueueEvent& event)
     {
         return false;
     }
-    if (!lockSd(pdMS_TO_TICKS(200)))
-    {
-        return false;
-    }
     if (!ensureQueueDir())
     {
-        unlockSd();
         return false;
     }
 
@@ -211,12 +200,10 @@ bool HttpNotifier::persistEvent(const QueueEvent& event)
     File file = SD.open(path, FILE_WRITE);
     if (!file)
     {
-        unlockSd();
         return false;
     }
     file.print(payload);
     file.close();
-    unlockSd();
     return true;
 }
 
@@ -288,10 +275,8 @@ String HttpNotifier::escapeJsonString(const String& input) const
 
 bool HttpNotifier::flushQueueOnce()
 {
-    Serial.println("HttpNotifier: Flushing queued events...");
     if (WiFi.status() != WL_CONNECTED)
     {
-        Serial.println("HttpNotifier: WiFi not connected");
         return false;
     }
 
@@ -304,15 +289,9 @@ bool HttpNotifier::flushQueueOnce()
 
     String path;
     String payload;
-    if (!lockSd(portMAX_DELAY))
-    {
-        Serial.println("HttpNotifier: Failed to lock SD card");
-        return false;
-    }
     File dir = SD.open("/queue");
     if (!dir || !dir.isDirectory())
     {
-        unlockSd();
         Serial.println("HttpNotifier: Failed to open queue directory");
         return false;
     }
@@ -342,19 +321,17 @@ bool HttpNotifier::flushQueueOnce()
     }
     dir.close();
 
-    Serial.println("HttpNotifier: Oldest queued event: " + oldest_name);
-
     if (oldest_name.length() == 0)
     {
-        unlockSd();
         return false;
     }
+
+    Serial.println("HttpNotifier: Processing queued event: " + oldest_name);
 
     path = String("/queue/") + oldest_name;
     File file = SD.open(path, FILE_READ);
     if (!file)
     {
-        unlockSd();
         return false;
     }
     while (file.available())
@@ -362,7 +339,6 @@ bool HttpNotifier::flushQueueOnce()
         payload += static_cast<char>(file.read());
     }
     file.close();
-    unlockSd();
 
     unsigned long long start_time = 0;
     if (!extractUInt64(payload, "start_time", &start_time))
@@ -376,11 +352,7 @@ bool HttpNotifier::flushQueueOnce()
         return false;
     }
 
-    if (lockSd(portMAX_DELAY))
-    {
-        SD.remove(path);
-        unlockSd();
-    }
+    SD.remove(path);
     Serial.println("HttpNotifier: end flushQueueOnce");
     return true;
 }
@@ -411,27 +383,9 @@ bool HttpNotifier::sendPayload(const String& payload, const time_t start_time)
 
 void HttpNotifier::notifyQueueTask()
 {
-    Serial.println("HttpNotifier: Notifying queue task");
     if (queue_task_)
     {
         xTaskNotifyGive(queue_task_);
-    }
-}
-
-bool HttpNotifier::lockSd(const TickType_t timeout)
-{
-    if (!sd_mutex_)
-    {
-        return true;
-    }
-    return xSemaphoreTake(sd_mutex_, timeout) == pdTRUE;
-}
-
-void HttpNotifier::unlockSd()
-{
-    if (sd_mutex_)
-    {
-        xSemaphoreGive(sd_mutex_);
     }
 }
 

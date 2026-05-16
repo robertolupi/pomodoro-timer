@@ -44,7 +44,6 @@ private:
     bool enabled_;
     TaskHandle_t queue_task_;
     QueueHandle_t event_queue_;
-    SemaphoreHandle_t sd_mutex_;
     std::array<String, 3> flavor_labels_;
 
     bool ensureQueueDir();
@@ -58,8 +57,6 @@ private:
     String flavorLabel(uint8_t flavor) const;
     String escapeJsonString(const String& input) const;
     void notifyQueueTask();
-    bool lockSd(TickType_t timeout);
-    void unlockSd();
     static void queueTaskTrampoline(void* context);
     void queueTask();
 };
