@@ -76,6 +76,7 @@ public:
 
     bool StartWork(uint8_t flavor, time_t work_duration = WORK_DEFAULT_DURATION_SECONDS, time_t break_duration = BREAK_DEFAULT_DURATION_SECONDS, time_t now = time(nullptr));
     bool ExtendWork(time_t additional_work_duration = 0, time_t now = time(nullptr));
+    bool CycleFlavor(time_t now = time(nullptr));
     bool Cancel(time_t now = time(nullptr));
     void PassageOfTime(time_t now = time(nullptr));
 

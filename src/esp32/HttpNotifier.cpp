@@ -41,12 +41,13 @@ void HttpNotifier::setFlavorLabels(const std::array<String, 3>& labels)
     flavor_labels_ = labels;
 }
 
-void HttpNotifier::notification(const ClockUpdate)
+void HttpNotifier::notification(const ClockUpdate update)
 {
     if (!enabled_)
     {
         return;
     }
+    current_work_flavor_ = update.work_flavor;
     notifyQueueTask();
 }
 

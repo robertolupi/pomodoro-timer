@@ -42,6 +42,19 @@ bool PomodoroClock::ExtendWork(const time_t additional_work_duration, const time
     return true;
 }
 
+bool PomodoroClock::CycleFlavor(const time_t now)
+{
+    if (state_ != WORK)
+    {
+        return false;
+    }
+    work_flavor_ = (work_flavor_ + 1) % 3;
+    last_update_at_ = now;
+    ClockUpdate update = {now, state_, work_flavor_, state_ends_at_ - now};
+    notify_observers(update);
+    return true;
+}
+
 bool PomodoroClock::Cancel(const time_t now)
 {
     bool result;

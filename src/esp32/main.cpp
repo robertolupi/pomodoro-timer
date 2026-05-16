@@ -124,6 +124,10 @@ void setup()
                 }
                 break;
             case WORK:
+                if (M5.BtnA.wasPressed())
+                {
+                    pomodoro.CycleFlavor();
+                }
                 if (M5.BtnB.wasPressed())
                 {
                     pomodoro.ExtendWork();
