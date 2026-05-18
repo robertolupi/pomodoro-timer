@@ -6,6 +6,7 @@
 
 #include "Configuration.h"
 #include "SDCard.h"
+#include "SPILock.h"
 
 ConfigurationClass Configuration;
 
@@ -17,6 +18,7 @@ bool ConfigurationClass::load()
         return false;
     }
 
+    SPILock spi_lock;
     std::ifstream file("/sd/config.ini");
     if (!file.is_open())
     {

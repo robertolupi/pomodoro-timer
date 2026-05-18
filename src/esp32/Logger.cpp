@@ -2,6 +2,7 @@
 
 #include "Logger.h"
 #include "SDCard.h"
+#include "SPILock.h"
 
 #include <Arduino.h>
 
@@ -20,6 +21,7 @@ void Logger::log_pomodoro(time_t start, time_t end, uint8_t flavor) {
         return;
     }
 
+    SPILock spi_lock;
     std::ofstream file(FILENAME, std::ios::app);
     if (!file.is_open())
     {

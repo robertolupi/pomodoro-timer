@@ -14,6 +14,7 @@
 #include "Pomodoro.h"
 #include "ClockFace.h"
 #include "Splash.h"
+#include "SPILock.h"
 #include "Gong.h"
 #include "Logger.h"
 #include "Leds.h"
@@ -149,7 +150,10 @@ void setup()
         // wait for the next second
         const time_t now = time(nullptr);
         for (int i = 0; i < 10; i++) {
-            M5.update();
+            {
+                SPILock spi_lock;
+                M5.update();
+            }
             if (M5.BtnA.wasPressed() || M5.BtnB.wasPressed() || M5.BtnC.wasPressed())
             {
                 break;

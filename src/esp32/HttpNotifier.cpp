@@ -11,6 +11,7 @@
 #include <WiFi.h>
 
 #include "SDCard.h"
+#include "SPILock.h"
 
 HttpNotifier::HttpNotifier(const char* host, const uint16_t port)
     : host_(host ? host : ""),
@@ -28,6 +29,7 @@ HttpNotifier::HttpNotifier(const char* host, const uint16_t port)
         SDCard with_sd_card;
         if (with_sd_card)
         {
+            SPILock spi_lock;
             ensureQueueDir();
         }
         event_queue_ = xQueueCreate(16, sizeof(QueueEvent*));
@@ -48,7 +50,6 @@ void HttpNotifier::notification(const ClockUpdate update)
         return;
     }
     current_work_flavor_ = update.work_flavor;
-    notifyQueueTask();
 }
 
 void HttpNotifier::notification(const IdleToWork update)
@@ -191,6 +192,8 @@ bool HttpNotifier::persistEvent(const QueueEvent& event)
     {
         return false;
     }
+
+    SPILock spi_lock;
     if (!ensureQueueDir())
     {
         return false;
@@ -274,88 +277,102 @@ String HttpNotifier::escapeJsonString(const String& input) const
     return output;
 }
 
-bool HttpNotifier::flushQueueOnce()
+HttpNotifier::FlushResult HttpNotifier::flushQueueOnce()
 {
     if (WiFi.status() != WL_CONNECTED)
     {
-        return false;
+        return FlushResult::ERROR;
     }
 
     SDCard with_sd_card;
     if (!with_sd_card)
     {
         Serial.println("HttpNotifier: SD card not available");
-        return false;
+        return FlushResult::EMPTY;
     }
 
     String path;
     String payload;
-    File dir = SD.open("/queue");
-    if (!dir || !dir.isDirectory())
-    {
-        Serial.println("HttpNotifier: Failed to open queue directory");
-        return false;
-    }
-
     time_t oldest_time = 0;
     String oldest_name;
-    File entry = dir.openNextFile();
-    while (entry)
+
     {
-        if (!entry.isDirectory())
+        SPILock spi_lock;
+        File dir = SD.open("/queue");
+        if (!dir || !dir.isDirectory())
         {
-            const String name = entry.name();
-            char* endptr = nullptr;
-            const unsigned long long ts = strtoull(name.c_str(), &endptr, 10);
-            if (ts > 0)
+            Serial.println("HttpNotifier: Failed to open queue directory");
+            return FlushResult::EMPTY;
+        }
+
+        File entry = dir.openNextFile();
+        while (entry)
+        {
+            if (!entry.isDirectory())
             {
-                if (oldest_time == 0 || ts < static_cast<unsigned long long>(oldest_time)
-                    || (ts == static_cast<unsigned long long>(oldest_time) && name < oldest_name))
+                const String name = entry.name();
+                char* endptr = nullptr;
+                const unsigned long long ts = strtoull(name.c_str(), &endptr, 10);
+                if (ts > 0)
                 {
-                    oldest_time = static_cast<time_t>(ts);
-                    oldest_name = name;
+                    if (oldest_time == 0 || ts < static_cast<unsigned long long>(oldest_time)
+                        || (ts == static_cast<unsigned long long>(oldest_time) && name < oldest_name))
+                    {
+                        oldest_time = static_cast<time_t>(ts);
+                        oldest_name = name;
+                    }
                 }
             }
+            entry.close();
+            entry = dir.openNextFile();
         }
-        entry.close();
-        entry = dir.openNextFile();
+        dir.close();
     }
-    dir.close();
 
     if (oldest_name.length() == 0)
     {
-        return false;
+        return FlushResult::EMPTY;
     }
 
     Serial.println("HttpNotifier: Processing queued event: " + oldest_name);
 
     path = String("/queue/") + oldest_name;
-    File file = SD.open(path, FILE_READ);
-    if (!file)
     {
-        return false;
+        SPILock spi_lock;
+        File file = SD.open(path, FILE_READ);
+        if (!file)
+        {
+            return FlushResult::ERROR;
+        }
+        while (file.available())
+        {
+            payload += static_cast<char>(file.read());
+        }
+        file.close();
     }
-    while (file.available())
-    {
-        payload += static_cast<char>(file.read());
-    }
-    file.close();
 
     unsigned long long start_time = 0;
     if (!extractUInt64(payload, "start_time", &start_time))
     {
-        return false;
+        {
+            SPILock spi_lock;
+            SD.remove(path);
+        }
+        return FlushResult::SUCCESS;
     }
 
     if (!sendPayload(payload, static_cast<time_t>(start_time)))
     {
         Serial.println("HttpNotifier: Failed to send payload");
-        return false;
+        return FlushResult::ERROR;
     }
 
-    SD.remove(path);
+    {
+        SPILock spi_lock;
+        SD.remove(path);
+    }
     Serial.println("HttpNotifier: end flushQueueOnce");
-    return true;
+    return FlushResult::SUCCESS;
 }
 
 bool HttpNotifier::sendPayload(const String& payload, const time_t start_time)
@@ -402,12 +419,13 @@ void HttpNotifier::queueTaskTrampoline(void* context)
 
 void HttpNotifier::queueTask()
 {
-    const TickType_t wait_ticks = pdMS_TO_TICKS(5000);
+    TickType_t wait_ticks = 0;
     for (;;)
     {
         ulTaskNotifyTake(pdTRUE, wait_ticks);
         if (!enabled_)
         {
+            wait_ticks = portMAX_DELAY;
             continue;
         }
         if (event_queue_)
@@ -422,9 +440,19 @@ void HttpNotifier::queueTask()
                 }
             }
         }
-        while (flushQueueOnce())
-        {
-            vTaskDelay(pdMS_TO_TICKS(50));
+        
+        FlushResult result;
+        do {
+            result = flushQueueOnce();
+            if (result == FlushResult::SUCCESS) {
+                vTaskDelay(pdMS_TO_TICKS(50));
+            }
+        } while (result == FlushResult::SUCCESS);
+
+        if (result == FlushResult::EMPTY) {
+            wait_ticks = portMAX_DELAY;
+        } else {
+            wait_ticks = pdMS_TO_TICKS(5000);
         }
     }
 }

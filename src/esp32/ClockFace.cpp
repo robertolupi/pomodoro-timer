@@ -3,6 +3,7 @@
 //
 
 #include "ClockFace.h"
+#include "SPILock.h"
 
 const char* days_of_week[] = {
     "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
@@ -43,6 +44,7 @@ inline void ClockFace::notification(ClockUpdate update)
     break;
   }
 
+  SPILock spi_lock;
   canvas_.pushSprite(0, 0);
 }
 

@@ -46,12 +46,18 @@ private:
     QueueHandle_t event_queue_;
     std::array<String, 3> flavor_labels_;
 
+    enum class FlushResult {
+        SUCCESS,
+        EMPTY,
+        ERROR
+    };
+
     bool ensureQueueDir();
     String makeQueueFilename(time_t event_time);
     String makePayload(time_t event_time, time_t start_time, const char* transition, const String& extra_json);
     bool enqueueEvent(time_t event_time, time_t start_time, const char* transition, const String& extra_json);
     bool persistEvent(const QueueEvent& event);
-    bool flushQueueOnce();
+    FlushResult flushQueueOnce();
     bool sendPayload(const String& payload, time_t start_time);
     bool extractUInt64(const String& payload, const char* key, unsigned long long* value) const;
     String flavorLabel(uint8_t flavor) const;
