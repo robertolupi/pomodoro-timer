@@ -2,33 +2,32 @@
 // Created by Roberto Lupi on 01.02.2025.
 //
 
-#include <fstream>
-
 #include "Configuration.h"
-#include "SDCard.h"
-#include "SPILock.h"
+#include "Global.h"
+#include <SD.h>
 
 ConfigurationClass Configuration;
 
 bool ConfigurationClass::load()
 {
-    SDCard with_sd_card;
-    if (!with_sd_card)
+    if (!ensureSDMounted())
     {
         return false;
     }
 
-    SPILock spi_lock;
-    std::ifstream file("/sd/config.ini");
-    if (!file.is_open())
+    std::lock_guard<std::recursive_mutex> lock(spi_mutex);
+    File file = SD.open("/config.ini", FILE_READ);
+    if (!file)
     {
         return false;
     }
 
     std::string line;
     std::string section;
-    while (std::getline(file, line))
+    while (file.available())
     {
+        String rawLine = file.readStringUntil('\n');
+        line = rawLine.c_str();
         line.erase(line.find_last_not_of(" \n\r\t") + 1);
         if (line.empty())
         {
@@ -48,5 +47,6 @@ bool ConfigurationClass::load()
         std::string value = line.substr(pos + 1);
         sections[section][key] = value;
     }
+    file.close();
     return true;
 }

@@ -14,12 +14,29 @@
 #include "Pomodoro.h"
 #include "ClockFace.h"
 #include "Splash.h"
-#include "SPILock.h"
+#include "Global.h"
 #include "Gong.h"
 #include "Logger.h"
 #include "Leds.h"
 #include "HttpNotifier.h"
 
+std::recursive_mutex spi_mutex;
+
+bool ensureSDMounted() {
+    static bool attempt_made = false;
+    static bool mounted = false;
+    
+    std::lock_guard<std::recursive_mutex> lock(spi_mutex);
+    if (!attempt_made) {
+        attempt_made = true;
+        if (!SD.begin(M5.getPin(m5::sd_spi_ss))) {
+            Serial.println("SD Card Mount Failed");
+        } else {
+            mounted = true;
+        }
+    }
+    return mounted;
+}
 
 void setup()
 {
@@ -151,7 +168,7 @@ void setup()
         const time_t now = time(nullptr);
         for (int i = 0; i < 10; i++) {
             {
-                SPILock spi_lock;
+                std::lock_guard<std::recursive_mutex> lock(spi_mutex);
                 M5.update();
             }
             if (M5.BtnA.wasPressed() || M5.BtnB.wasPressed() || M5.BtnC.wasPressed())

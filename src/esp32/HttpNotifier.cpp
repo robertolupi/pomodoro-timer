@@ -9,9 +9,9 @@
 #include <HTTPClient.h>
 #include <SD.h>
 #include <WiFi.h>
+#include <ArduinoJson.h>
 
-#include "SDCard.h"
-#include "SPILock.h"
+#include "Global.h"
 
 HttpNotifier::HttpNotifier(const char* host, const uint16_t port)
     : host_(host ? host : ""),
@@ -26,10 +26,9 @@ HttpNotifier::HttpNotifier(const char* host, const uint16_t port)
     enabled_ = host_.length() > 0 && port_ > 0;
     if (enabled_)
     {
-        SDCard with_sd_card;
-        if (with_sd_card)
+        if (ensureSDMounted())
         {
-            SPILock spi_lock;
+            std::lock_guard<std::recursive_mutex> lock(spi_mutex);
             ensureQueueDir();
         }
         event_queue_ = xQueueCreate(16, sizeof(QueueEvent*));
@@ -147,19 +146,22 @@ String HttpNotifier::makeQueueFilename(const time_t event_time)
 
 String HttpNotifier::makePayload(const time_t event_time, const time_t start_time, const char* transition, const String& extra_json)
 {
-    String payload = "{";
-    payload += "\"transition\":\"";
-    payload += transition;
-    payload += "\",\"start_time\":";
-    payload += String(static_cast<unsigned long>(start_time));
-    payload += ",\"event_time\":";
-    payload += String(static_cast<unsigned long>(event_time));
+    JsonDocument doc;
+    doc["transition"] = transition;
+    doc["start_time"] = static_cast<unsigned long>(start_time);
+    doc["event_time"] = static_cast<unsigned long>(event_time);
+
     if (extra_json.length() > 0)
     {
-        payload += ",";
-        payload += extra_json;
+        JsonDocument extra_doc;
+        deserializeJson(extra_doc, "{" + extra_json + "}");
+        for (JsonPair kv : extra_doc.as<JsonObject>()) {
+            doc[kv.key()] = kv.value();
+        }
     }
-    payload += "}";
+
+    String payload;
+    serializeJson(doc, payload);
     return payload;
 }
 
@@ -187,13 +189,12 @@ bool HttpNotifier::enqueueEvent(const time_t event_time, const time_t start_time
 
 bool HttpNotifier::persistEvent(const QueueEvent& event)
 {
-    SDCard with_sd_card;
-    if (!with_sd_card)
+    if (!ensureSDMounted())
     {
         return false;
     }
 
-    SPILock spi_lock;
+    std::lock_guard<std::recursive_mutex> lock(spi_mutex);
     if (!ensureQueueDir())
     {
         return false;
@@ -213,27 +214,15 @@ bool HttpNotifier::persistEvent(const QueueEvent& event)
 
 bool HttpNotifier::extractUInt64(const String& payload, const char* key, unsigned long long* value) const
 {
-    String token = String("\"") + key + "\":";
-    const int start = payload.indexOf(token);
-    if (start < 0)
-    {
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, payload);
+    if (error) {
         return false;
     }
-    int index = start + token.length();
-    while (index < payload.length() && payload[index] == ' ')
-    {
-        index++;
-    }
-    int end = index;
-    while (end < payload.length() && isdigit(static_cast<unsigned char>(payload[end])))
-    {
-        end++;
-    }
-    if (end == index)
-    {
+    if (!doc.containsKey(key)) {
         return false;
     }
-    *value = strtoull(payload.substring(index, end).c_str(), nullptr, 10);
+    *value = doc[key].as<unsigned long long>();
     return true;
 }
 
@@ -284,8 +273,7 @@ HttpNotifier::FlushResult HttpNotifier::flushQueueOnce()
         return FlushResult::ERROR;
     }
 
-    SDCard with_sd_card;
-    if (!with_sd_card)
+    if (!ensureSDMounted())
     {
         Serial.println("HttpNotifier: SD card not available");
         return FlushResult::EMPTY;
@@ -297,7 +285,7 @@ HttpNotifier::FlushResult HttpNotifier::flushQueueOnce()
     String oldest_name;
 
     {
-        SPILock spi_lock;
+        std::lock_guard<std::recursive_mutex> lock(spi_mutex);
         File dir = SD.open("/queue");
         if (!dir || !dir.isDirectory())
         {
@@ -338,7 +326,7 @@ HttpNotifier::FlushResult HttpNotifier::flushQueueOnce()
 
     path = String("/queue/") + oldest_name;
     {
-        SPILock spi_lock;
+        std::lock_guard<std::recursive_mutex> lock(spi_mutex);
         File file = SD.open(path, FILE_READ);
         if (!file)
         {
@@ -355,7 +343,7 @@ HttpNotifier::FlushResult HttpNotifier::flushQueueOnce()
     if (!extractUInt64(payload, "start_time", &start_time))
     {
         {
-            SPILock spi_lock;
+            std::lock_guard<std::recursive_mutex> lock(spi_mutex);
             SD.remove(path);
         }
         return FlushResult::SUCCESS;
@@ -368,7 +356,7 @@ HttpNotifier::FlushResult HttpNotifier::flushQueueOnce()
     }
 
     {
-        SPILock spi_lock;
+        std::lock_guard<std::recursive_mutex> lock(spi_mutex);
         SD.remove(path);
     }
     Serial.println("HttpNotifier: end flushQueueOnce");

@@ -1,9 +1,6 @@
-#include <fstream>
-
 #include "Logger.h"
-#include "SDCard.h"
-#include "SPILock.h"
-
+#include "Global.h"
+#include <SD.h>
 #include <Arduino.h>
 
 String isoformat_ctime(const time_t* t)
@@ -15,15 +12,14 @@ String isoformat_ctime(const time_t* t)
 }
 
 void Logger::log_pomodoro(time_t start, time_t end, uint8_t flavor) {
-    SDCard with_sd_card;
-    if (!with_sd_card)
+    if (!ensureSDMounted())
     {
         return;
     }
 
-    SPILock spi_lock;
-    std::ofstream file(FILENAME, std::ios::app);
-    if (!file.is_open())
+    std::lock_guard<std::recursive_mutex> lock(spi_mutex);
+    File file = SD.open(FILENAME, FILE_APPEND);
+    if (!file)
     {
         return;
     }
@@ -31,5 +27,11 @@ void Logger::log_pomodoro(time_t start, time_t end, uint8_t flavor) {
     String st_start = isoformat_ctime(&start);
     String st_end = isoformat_ctime(&end);
 
-    file << st_start.c_str() << "," << st_end.c_str() << "," << static_cast<int>(flavor) << "\n";
+    file.print(st_start);
+    file.print(",");
+    file.print(st_end);
+    file.print(",");
+    file.print(flavor);
+    file.print("\n");
+    file.close();
 }

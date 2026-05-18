@@ -3,7 +3,7 @@
 //
 
 #include "ClockFace.h"
-#include "SPILock.h"
+#include "Global.h"
 
 const char* days_of_week[] = {
     "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
@@ -44,7 +44,7 @@ inline void ClockFace::notification(ClockUpdate update)
     break;
   }
 
-  SPILock spi_lock;
+  std::lock_guard<std::recursive_mutex> lock(spi_mutex);
   canvas_.pushSprite(0, 0);
 }
 
